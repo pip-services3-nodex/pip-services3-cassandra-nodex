@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+
+  cassandra:
+    image: bitnami/cassandra:latest
+    environment:
+      CASSANDRA_CLUSTER_NAME: test
+      CASSANDRA_USER: cassandra
+      CASSANDRA_PASSWORD: cassandra
+      CASSANDRA_DB: test
+    ports:
+      - "9042:9042"
