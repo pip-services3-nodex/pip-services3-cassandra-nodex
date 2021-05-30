@@ -66,7 +66,7 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
 
   protected defineSchema(): void {
     this.clearSchema();
-    this.ensureSchema("CREATE TABLE " + this._tableName + " (id TEXT PRIMARY KEY, key TEXT, value TEXT");
+    this.ensureSchema("CREATE TABLE " + this._tableName + " (id TEXT PRIMARY KEY, key TEXT, value TEXT)");
     this.ensureIndex("key", { key: 1 }, { unique: true });
   }
 
