@@ -61,9 +61,13 @@ import { IdentifiableCassandraPersistence } from 'pip-services3-cassandra-nodex'
 
 export class MyCassandraPersistence extends IdentifableCassandraPersistence {
   public constructor() {
-    super("myobjects");
-    this.autoCreateObject("CREATE TABLE myobjects (id VARCHAR(32) PRIMARY KEY, key VARCHAR(50), value VARCHAR(255)");
-    this.ensureIndex("myobjects_key", { key: 1 }, { unique: true });
+    super("mykeyspace.myobjects");
+  }
+
+  protected defineSchema(): void {
+    this.clearSchema();
+    this.ensureSchema("CREATE TABLE " + this._tableName + " (id TEXT PRIMARY KEY, key TEXT, value TEXT");
+    this.ensureIndex("key", { key: 1 }, { unique: true });
   }
 
   private composeFilter(filter: FilterParams): any {
@@ -93,98 +97,24 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
   }  
   
   public getOneByKey(correlationId: string, key: string): Promise<MyObject> {
-    let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"key\"=$1";
+    let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"key\"=?";
     let params = [ key ];
 
-    return new Promise((resolve, reject) => {
-      this._client.query(query, params, (err, result) => {
-        if (err != null) {
-          reject(err);
-          return;
-        }
+    let result = this._client.execute(query, params);
+    let item = result && result.rows ? result.rows[0] || null : null; 
 
-        let item = result && result.rows ? result.rows[0] || null : null; 
+    if (item == null)
+      this._logger.trace(correlationId, "Nothing found from %s with key = %s", this._tableName, key);
+    else
+      this._logger.trace(correlationId, "Retrieved from %s with key = %s", this._tableName, key);
 
-        if (item == null)
-          this._logger.trace(correlationId, "Nothing found from %s with key = %s", this._tableName, key);
-        else
-          this._logger.trace(correlationId, "Retrieved from %s with key = %s", this._tableName, key);
-
-        item = this.convertToPublic(item);
-        resolve(item);
-      });
-    });
+    item = this.convertToPublic(item);
+    return item;
   }
 
 }
 ```
 
-Alternatively you can store data in non-relational format using `IdentificableJsonCassandraPersistence`.
-It stores data in tables with two columns - `id` with unique object id and `data` with object data serialized as JSON.
-To access data fields you shall use `data->'field'` expression or `data->>'field'` expression for string values.
-
-```typescript
-import { IdentifiableJsonCassandraPersistence } from 'pip-services3-cassandra-nodex';
-
-export class MyCassandraPersistence extends IdentifableJsonCassandraPersistence {
-  public constructor() {
-    super("myobjects");
-    this.ensureTable("VARCHAR(32)", "JSONB");
-    this.ensureIndex("myobjects_key", { "data->>'key'": 1 }, { unique: true });
-  }
-
-  private composeFilter(filter: FilterParams): any {
-    filter = filter || new FilterParams();
-    
-    let criteria = [];
-
-    let id = filter.getAsNullableString('id');
-    if (id != null)
-        criteria.push("data->>'id'='" + id + "'");
-
-    let tempIds = filter.getAsNullableString("ids");
-    if (tempIds != null) {
-        let ids = tempIds.split(",");
-        filters.push("data->>'id' IN ('" + ids.join("','") + "')");
-    }
-
-    let key = filter.getAsNullableString("key");
-    if (key != null)
-        criteria.push("data->>'key'='" + key + "'");
-
-    return criteria.length > 0 ? criteria.join(" AND ") : null;
-  }
-  
-  public getPageByFilter(correlationId: string, filter: FilterParams, paging: PagingParams): Promise<DataPage<MyObject>> {
-    return super.getPageByFilter(correlationId, this.composeFilter(filter), paging, "id", null);
-  }  
-  
-  public getOneByKey(correlationId: string, key: string): Promise<MyObject> { 
-    let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE data->>'key'=$1";
-    let params = [ key ];
-
-    return new Promise((resolve, reject) => {
-      this._client.query(query, params, (err, result) => {
-        if (err != null) {
-          reject(err);
-          return;
-        }
-
-        let item = result && result.rows ? result.rows[0] || null : null; 
-
-        if (item == null)
-          this._logger.trace(correlationId, "Nothing found from %s with key = %s", this._tableName, key);
-        else
-          this._logger.trace(correlationId, "Retrieved from %s with key = %s", this._tableName, key);
-
-        item = this.convertToPublic(item);
-        resolve(item);
-      });
-    });
-  }
-
-}
-```
 
 Configuration for your microservice that includes cassandraql persistence may look the following way.
 
@@ -196,7 +126,7 @@ Configuration for your microservice that includes cassandraql persistence may lo
     uri: {{{CASSANDRA_SERVICE_URI}}}
     host: {{{CASSANDRA_SERVICE_HOST}}}{{#unless CASSANDRA_SERVICE_HOST}}localhost{{/unless}}
     port: {{CASSANDRA_SERVICE_PORT}}{{#unless CASSANDRA_SERVICE_PORT}}9042{{/unless}}
-    database: {{CASSANDRA_DB}}{{#unless CASSANDRA_DB}}app{{/unless}}
+    datacenter: {{CASSANDRA_DATACENTER}}{{#unless CASSANDRA_DATACENTER}}datacenter1{{/unless}}
   credential:
     username: {{CASSANDRA_USER}}
     password: {{CASSANDRA_PASS}}
@@ -204,7 +134,7 @@ Configuration for your microservice that includes cassandraql persistence may lo
 - descriptor: myservice:persistence:cassandra:default:1.0
   dependencies:
     connection: pip-services:connection:cassandra:con1:1.0
-  table: {{CASSANDRA_TABLE}}{{#unless CASSANDRA_TABLE}}myobjects{{/unless}}
+  table: {{CASSANDRA_TABLE}}{{#unless CASSANDRA_TABLE}}mykeyspace.myobjects{{/unless}}
 {{/if}}
 ...
 ```
