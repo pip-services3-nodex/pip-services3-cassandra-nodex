@@ -66,7 +66,7 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
 
   protected defineSchema(): void {
     this.clearSchema();
-    this.ensureSchema("CREATE TABLE " + this._tableName + " (id TEXT PRIMARY KEY, key TEXT, value TEXT)");
+    this.ensureSchema("CREATE TABLE " + this.quotedTableName() + " (id TEXT PRIMARY KEY, key TEXT, value TEXT)");
     this.ensureIndex("key", { key: 1 }, { unique: true });
   }
 
@@ -97,11 +97,7 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
   }  
   
   public getOneByKey(correlationId: string, key: string): Promise<MyObject> {
-<<<<<<< HEAD
-    let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"key\"=$1";
-=======
     let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"key\"=?";
->>>>>>> 5b8ed2982a02c53ce7233dc9d2017a6a2e78983e
     let params = [ key ];
 
     let result = this._client.execute(query, params);
@@ -118,76 +114,6 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
 
 }
 ```
-
-<<<<<<< HEAD
-Alternatively you can store data in non-relational format using `IdentificableJsonCassandraPersistence`.
-It stores data in tables with two columns - `id` with unique object id and `data` with object data serialized as JSON.
-To access data fields you shall use `data->'field'` expression or `data->>'field'` expression for string values.
-
-```typescript
-import { IdentifiableJsonCassandraPersistence } from 'pip-services3-cassandra-nodex';
-
-export class MyCassandraPersistence extends IdentifableJsonCassandraPersistence {
-  public constructor() {
-    super("myobjects");
-    this.ensureTable("VARCHAR(32)", "JSONB");
-    this.ensureIndex("myobjects_key", { "data->>'key'": 1 }, { unique: true });
-  }
-
-  private composeFilter(filter: FilterParams): any {
-    filter = filter || new FilterParams();
-    
-    let criteria = [];
-
-    let id = filter.getAsNullableString('id');
-    if (id != null)
-        criteria.push("data->>'id'='" + id + "'");
-
-    let tempIds = filter.getAsNullableString("ids");
-    if (tempIds != null) {
-        let ids = tempIds.split(",");
-        filters.push("data->>'id' IN ('" + ids.join("','") + "')");
-    }
-
-    let key = filter.getAsNullableString("key");
-    if (key != null)
-        criteria.push("data->>'key'='" + key + "'");
-
-    return criteria.length > 0 ? criteria.join(" AND ") : null;
-  }
-  
-  public getPageByFilter(correlationId: string, filter: FilterParams, paging: PagingParams): Promise<DataPage<MyObject>> {
-    return super.getPageByFilter(correlationId, this.composeFilter(filter), paging, "id", null);
-  }  
-  
-  public getOneByKey(correlationId: string, key: string): Promise<MyObject> { 
-    let query = "SELECT * FROM " + this.quotedTableName() + " WHERE data->>'key'=$1";
-    let params = [ key ];
-
-    return new Promise((resolve, reject) => {
-      this._client.query(query, params, (err, result) => {
-        if (err != null) {
-          reject(err);
-          return;
-        }
-
-        let item = result && result.rows ? result.rows[0] || null : null; 
-
-        if (item == null)
-          this._logger.trace(correlationId, "Nothing found from %s with key = %s", this._tableName, key);
-        else
-          this._logger.trace(correlationId, "Retrieved from %s with key = %s", this._tableName, key);
-
-        item = this.convertToPublic(item);
-        resolve(item);
-      });
-    });
-  }
-
-}
-```
-=======
->>>>>>> 5b8ed2982a02c53ce7233dc9d2017a6a2e78983e
 
 Configuration for your microservice that includes cassandraql persistence may look the following way.
 
