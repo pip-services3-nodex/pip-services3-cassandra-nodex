@@ -23,7 +23,8 @@ import { CassandraPersistence } from './CassandraPersistence';
 
  * ### Configuration parameters ###
  * 
- * - collection:                  (optional) Cassandra collection name
+ * - table:                       (optional) Cassandra table name
+ * - keyspace:                    (optional) Cassandra keyspace name
  * - connection(s):    
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-nodex.github.io/pip-services3-components-nodex/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -92,14 +93,11 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
     /**
      * Creates a new instance of the persistence component.
      * 
-     * @param collection    (optional) a collection name.
+     * @param tableName    (optional) a table name.
+     * @param keyspaceName    (optional) a keyspace name.
      */
-    public constructor(tableName: string) {
-        super(tableName);
-
-        if (tableName == null) {
-            throw new Error("Table name could not be null");
-        }
+    public constructor(tableName: string, keyspaceName?: string) {
+        super(tableName, keyspaceName);
     }
 
     /** 
@@ -121,7 +119,7 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
      */
     public async getListByIds(correlationId: string, ids: K[]): Promise<T[]> {
         let params = this.generateParameters(ids);
-        let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName)
+        let query = "SELECT * FROM " + this.quotedTableName()
             + " WHERE \"id\" IN(" + params + ")";
 
         let result = await this._client.execute(query, ids);
@@ -141,7 +139,7 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
      * @returns                 a found data item or <code>null</code>.
      */
     public async getOneById(correlationId: string, id: K): Promise<T> {
-        let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+        let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
         let params = [ id ];
 
         let result = await this._client.execute(query, params);
@@ -214,7 +212,7 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
         let values = this.generateValues(row);
         values.push(item.id);
 
-        let query = "UPDATE " + this.quoteIdentifier(this._tableName)
+        let query = "UPDATE " + this.quotedTableName()
             + " SET " + params + " WHERE \"id\"=?";
 
         await this._client.execute(query, values);
@@ -247,11 +245,11 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
         let values = this.generateValues(row);
         values.push(id);
 
-        let query = "UPDATE " + this.quoteIdentifier(this._tableName)
+        let query = "UPDATE " + this.quotedTableName()
             + " SET " + params + " WHERE \"id\"=?";
         await this._client.execute(query, values);
 
-        query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+        query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
         let result = await this._client.execute(query, [id]);
         let newItem = result && result.rows && result.rows.length == 1
             ? result.rows[0] : null;
@@ -272,13 +270,13 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
     public async deleteById(correlationId: string, id: K): Promise<T> {
         let values = [ id ];
 
-        let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+        let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
         let result = await this._client.execute(query, values);
         let oldItem = result && result.rows && result.rows.length == 1
             ? result.rows[0] : null;
 
         if (oldItem != null) {
-            query = "DELETE FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+            query = "DELETE FROM " + this.quotedTableName() + " WHERE \"id\"=?";
             await this._client.execute(query, values);
         
             this._logger.trace(correlationId, "Deleted from %s with id = %s", this._tableName, id);
@@ -296,7 +294,7 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
      */
     public async deleteByIds(correlationId: string, ids: K[]): Promise<void> {
         let params = this.generateParameters(ids);
-        let query = "DELETE FROM " + this.quoteIdentifier(this._tableName)
+        let query = "DELETE FROM " + this.quotedTableName()
             + " WHERE \"id\" IN(" + params + ")";
 
         await this._client.execute(query, ids);

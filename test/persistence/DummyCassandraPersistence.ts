@@ -11,12 +11,12 @@ export class DummyCassandraPersistence
     implements IDummyPersistence
 {
     public constructor() {
-        super('test.dummies');
+        super('dummies', 'test');
     }
 
     protected defineSchema(): void {
         this.clearSchema();
-        this.ensureSchema('CREATE TABLE ' + this._tableName + ' (id TEXT PRIMARY KEY, key TEXT, content TEXT)');
+        this.ensureSchema('CREATE TABLE ' + this.quotedTableName() + ' (id TEXT PRIMARY KEY, key TEXT, content TEXT)');
         this.ensureIndex('key', { key: 1 }, { unique: true });
     }
 

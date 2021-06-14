@@ -27,7 +27,8 @@ import { CassandraConnection } from '../connect/CassandraConnection';
  * 
  * ### Configuration parameters ###
  * 
- * - collection:                  (optional) Cassandra collection name
+ * - table:                       (optional) Cassandra table name
+ * - keyspace:                    (optional) Cassandra keyspace name
  * - connection(s):    
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-nodex.github.io/pip-services3-components-nodex/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -147,23 +148,27 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      */
     protected _datacenter: string;
     /**
-     * The Cassandra keyspace name.
-     */
-    protected _keyspace: string;
-    /**
      * The Cassandra table object.
      */
     protected _tableName: string;
-
+    /**
+     * The Cassandra keyspace name.
+     */
+    protected _keyspaceName: string;
+    /**
+     * The maximum number of objects in data pages
+     */
     protected _maxPageSize: number = 100;
 
     /**
      * Creates a new instance of the persistence component.
      * 
      * @param tableName    (optional) a table name.
+     * @param keyspaceName    (optional) a keyspace name.
      */
-    public constructor(tableName?: string) {
+    public constructor(tableName?: string, keyspaceName?: string) {
         this._tableName = tableName;
+        this._keyspaceName = keyspaceName;
     }
 
     /**
@@ -181,6 +186,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         this._tableName = config.getAsStringWithDefault("collection", this._tableName);
         this._tableName = config.getAsStringWithDefault("table", this._tableName);
+        this._keyspaceName = config.getAsStringWithDefault("keyspace", this._keyspaceName);
     }
 
     /**
@@ -214,11 +220,13 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     private createConnection(): CassandraConnection {
         let connection = new CassandraConnection();
         
-        if (this._config)
+        if (this._config) {
             connection.configure(this._config);
+        }
         
-        if (this._references)
+        if (this._references) {
             connection.setReferences(this._references);
+        }
             
         return connection;
     }
@@ -237,7 +245,12 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         //     builder += " UNIQUE";
         // }
         
-        builder += " INDEX IF NOT EXISTS " + this.quoteIdentifier(name) + " ON " + this.quoteIdentifier(this._tableName);
+        let indexName = this.quoteIdentifier(name);
+        if (indexName != null) {
+            indexName += this.quoteIdentifier(this._keyspaceName) + "." + indexName;
+        }
+        
+        builder += " INDEX IF NOT EXISTS " + indexName + " ON " + this.quotedTableName();
 
         if (options.type) {
             builder += " " + options.type;
@@ -277,6 +290,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      */
     protected defineSchema(): void {
         // Todo: override in chile classes
+        this.clearSchema();
     }
 
     /** 
@@ -305,13 +319,21 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     protected quoteIdentifier(value: string): string {
         if (value == null || value == "") return value;
 
-        // Special condition for table names with keyspaces
-        let pos = value.indexOf(".");
-        if (pos > 0) return value;
-
         if (value[0] == '"') return value;
 
         return '"' + value + '"';
+    }
+
+    protected quotedTableName(): string {
+        if (this._tableName == null) {
+            return null;
+        }
+
+        let builder = this.quoteIdentifier(this._tableName);
+        if (this._keyspaceName != null) {
+            builder = this.quoteIdentifier(this._keyspaceName) + "." + this._tableName;
+        }
+        return builder;
     }
 
     /**
@@ -362,14 +384,6 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         this._client = this._connection.getConnection();
         this._datacenter = this._connection.getDatacenter();
-
-        this._keyspace = this._connection.getKeyspace();
-        if (this._keyspace == null && this._tableName != null) {
-            let pos = this._tableName.indexOf(".");
-            if (pos > 0) {
-                this._keyspace = this._tableName.substring(0, pos);
-            }
-        }
         
         // Define database schema
         this.defineSchema();
@@ -378,7 +392,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         await this.createSchema(correlationId);
 
         this._opened = true;
-        this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quoteIdentifier(this._tableName));                        
+        this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quotedTableName());                        
     }
 
     /**
@@ -418,7 +432,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
             throw new Error('Table name is not defined');
         }
 
-        let query = "TRUNCATE " + this.quoteIdentifier(this._tableName);
+        let query = "TRUNCATE " + this.quotedTableName();
         await this._client.execute(query);
     }
 
@@ -428,7 +442,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         }
     
         // Check if table exist to determine weither to auto create objects
-        let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " LIMIT 1";
+        let query = "SELECT * FROM " + this.quotedTableName() + " LIMIT 1";
         let keyspaceExist = true;
         let tableExist = true;
         try {
@@ -453,7 +467,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         // Create keyspace if it doesn't exist\
         if (!keyspaceExist) {
-            query = "CREATE KEYSPACE IF NOT EXISTS " + this._keyspace + " WITH replication={'class': 'SimpleStrategy', 'replication_factor': 3}";
+            query = "CREATE KEYSPACE IF NOT EXISTS " + this._keyspaceName + " WITH replication={'class': 'SimpleStrategy', 'replication_factor': 3}";
             await this._client.execute(query);
         }
 
@@ -547,7 +561,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         sort: any, select: any): Promise<DataPage<T>> {
         
         select = select != null ? select : "*"
-        let query = "SELECT " + select + " FROM " + this.quoteIdentifier(this._tableName);
+        let query = "SELECT " + select + " FROM " + this.quotedTableName();
 
         // Adjust max item count based on configuration
         paging = paging || new PagingParams();
@@ -594,7 +608,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         items = items.map(this.convertToPublic);
 
         if (pagingEnabled) {
-            let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+            let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
             if (filter != null && filter != "") {
                 query += " WHERE " + filter;
             }
@@ -620,7 +634,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      * @returns                 a number of items that satisfy the filter.
      */
     protected async getCountByFilter(correlationId: string, filter: any): Promise<number> {
-        let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+        let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
 
         if (filter != null) {
             query += " WHERE " + filter;
@@ -652,7 +666,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         sort: any, select: any): Promise<T[]> {
 
         select = select != null ? select : "*"
-        let query = "SELECT " + select + " FROM " + this.quoteIdentifier(this._tableName);
+        let query = "SELECT " + select + " FROM " + this.quotedTableName();
 
         if (filter != null) {
             query += " WHERE " + filter;
@@ -682,7 +696,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      * @returns                 a random item that satisfies the filter.
      */
     protected async getOneRandom(correlationId: string, filter: any): Promise<T> {
-        let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+        let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
         if (filter != null) {
             query += " WHERE " + filter;
         }
@@ -690,7 +704,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         let result = await this._client.execute(query);
         let count = result.rows && result.rows.length == 1 ? result.rows[0].count : 0;
            
-        query = "SELECT * FROM " + this.quoteIdentifier(this._tableName);    
+        query = "SELECT * FROM " + this.quotedTableName();    
         if (filter != null) {
             query += " WHERE " + filter;
         }
@@ -741,7 +755,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         let params = this.generateParameters(row);
         let values = this.generateValues(row);
 
-        let query = "INSERT INTO " + this.quoteIdentifier(this._tableName)
+        let query = "INSERT INTO " + this.quotedTableName()
             + " (" + columns + ") VALUES (" + params + ")";
 
         await this._client.execute(query, values);
@@ -761,7 +775,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      * @param filter            (optional) a filter JSON object.
      */
     public async deleteByFilter(correlationId: string, filter: any): Promise<void> {
-        let query = "DELETE FROM " + this.quoteIdentifier(this._tableName);
+        let query = "DELETE FROM " + this.quotedTableName();
         if (filter != null) {
             query += " WHERE " + filter;
         }

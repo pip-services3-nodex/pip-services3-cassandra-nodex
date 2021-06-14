@@ -29,7 +29,8 @@ const CassandraConnection_1 = require("../connect/CassandraConnection");
  *
  * ### Configuration parameters ###
  *
- * - collection:                  (optional) Cassandra collection name
+ * - table:                       (optional) Cassandra table name
+ * - keyspace:                    (optional) Cassandra keyspace name
  * - connection(s):
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-nodex.github.io/pip-services3-components-nodex/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -108,8 +109,9 @@ class CassandraPersistence {
      * Creates a new instance of the persistence component.
      *
      * @param tableName    (optional) a table name.
+     * @param keyspaceName    (optional) a keyspace name.
      */
-    constructor(tableName) {
+    constructor(tableName, keyspaceName) {
         this._schemaStatements = [];
         /**
          * The dependency resolver.
@@ -119,8 +121,12 @@ class CassandraPersistence {
          * The logger.
          */
         this._logger = new pip_services3_components_nodex_1.CompositeLogger();
+        /**
+         * The maximum number of objects in data pages
+         */
         this._maxPageSize = 100;
         this._tableName = tableName;
+        this._keyspaceName = keyspaceName;
     }
     /**
      * Configures component by passing configuration parameters.
@@ -134,6 +140,7 @@ class CassandraPersistence {
         this._maxPageSize = config.getAsIntegerWithDefault("options.max_page_size", this._maxPageSize);
         this._tableName = config.getAsStringWithDefault("collection", this._tableName);
         this._tableName = config.getAsStringWithDefault("table", this._tableName);
+        this._keyspaceName = config.getAsStringWithDefault("keyspace", this._keyspaceName);
     }
     /**
      * Sets references to dependent components.
@@ -163,10 +170,12 @@ class CassandraPersistence {
     }
     createConnection() {
         let connection = new CassandraConnection_1.CassandraConnection();
-        if (this._config)
+        if (this._config) {
             connection.configure(this._config);
-        if (this._references)
+        }
+        if (this._references) {
             connection.setReferences(this._references);
+        }
         return connection;
     }
     /**
@@ -181,7 +190,11 @@ class CassandraPersistence {
         // if (options.unique) {
         //     builder += " UNIQUE";
         // }
-        builder += " INDEX IF NOT EXISTS " + this.quoteIdentifier(name) + " ON " + this.quoteIdentifier(this._tableName);
+        let indexName = this.quoteIdentifier(name);
+        if (indexName != null) {
+            indexName += this.quoteIdentifier(this._keyspaceName) + "." + indexName;
+        }
+        builder += " INDEX IF NOT EXISTS " + indexName + " ON " + this.quotedTableName();
         if (options.type) {
             builder += " " + options.type;
         }
@@ -215,6 +228,7 @@ class CassandraPersistence {
      */
     defineSchema() {
         // Todo: override in chile classes
+        this.clearSchema();
     }
     /**
      * Converts object value from internal to public format.
@@ -241,13 +255,19 @@ class CassandraPersistence {
     quoteIdentifier(value) {
         if (value == null || value == "")
             return value;
-        // Special condition for table names with keyspaces
-        let pos = value.indexOf(".");
-        if (pos > 0)
-            return value;
         if (value[0] == '"')
             return value;
         return '"' + value + '"';
+    }
+    quotedTableName() {
+        if (this._tableName == null) {
+            return null;
+        }
+        let builder = this.quoteIdentifier(this._tableName);
+        if (this._keyspaceName != null) {
+            builder = this.quoteIdentifier(this._keyspaceName) + "." + this._tableName;
+        }
+        return builder;
     }
     /**
      * Checks if the component is opened.
@@ -283,19 +303,12 @@ class CassandraPersistence {
             this._opened = false;
             this._client = this._connection.getConnection();
             this._datacenter = this._connection.getDatacenter();
-            this._keyspace = this._connection.getKeyspace();
-            if (this._keyspace == null && this._tableName != null) {
-                let pos = this._tableName.indexOf(".");
-                if (pos > 0) {
-                    this._keyspace = this._tableName.substring(0, pos);
-                }
-            }
             // Define database schema
             this.defineSchema();
             // Recreate objects
             yield this.createSchema(correlationId);
             this._opened = true;
-            this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quoteIdentifier(this._tableName));
+            this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quotedTableName());
         });
     }
     /**
@@ -329,7 +342,7 @@ class CassandraPersistence {
             if (this._tableName == null) {
                 throw new Error('Table name is not defined');
             }
-            let query = "TRUNCATE " + this.quoteIdentifier(this._tableName);
+            let query = "TRUNCATE " + this.quotedTableName();
             yield this._client.execute(query);
         });
     }
@@ -339,7 +352,7 @@ class CassandraPersistence {
                 return null;
             }
             // Check if table exist to determine weither to auto create objects
-            let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " LIMIT 1";
+            let query = "SELECT * FROM " + this.quotedTableName() + " LIMIT 1";
             let keyspaceExist = true;
             let tableExist = true;
             try {
@@ -363,7 +376,7 @@ class CassandraPersistence {
             }
             // Create keyspace if it doesn't exist\
             if (!keyspaceExist) {
-                query = "CREATE KEYSPACE IF NOT EXISTS " + this._keyspace + " WITH replication={'class': 'SimpleStrategy', 'replication_factor': 3}";
+                query = "CREATE KEYSPACE IF NOT EXISTS " + this._keyspaceName + " WITH replication={'class': 'SimpleStrategy', 'replication_factor': 3}";
                 yield this._client.execute(query);
             }
             this._logger.debug(correlationId, 'Table ' + this._tableName + ' does not exist. Creating database objects...');
@@ -449,7 +462,7 @@ class CassandraPersistence {
     getPageByFilter(correlationId, filter, paging, sort, select) {
         return __awaiter(this, void 0, void 0, function* () {
             select = select != null ? select : "*";
-            let query = "SELECT " + select + " FROM " + this.quoteIdentifier(this._tableName);
+            let query = "SELECT " + select + " FROM " + this.quotedTableName();
             // Adjust max item count based on configuration
             paging = paging || new pip_services3_commons_nodex_2.PagingParams();
             let skip = paging.getSkip(-1);
@@ -485,7 +498,7 @@ class CassandraPersistence {
             this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._tableName);
             items = items.map(this.convertToPublic);
             if (pagingEnabled) {
-                let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+                let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
                 if (filter != null && filter != "") {
                     query += " WHERE " + filter;
                 }
@@ -511,7 +524,7 @@ class CassandraPersistence {
      */
     getCountByFilter(correlationId, filter) {
         return __awaiter(this, void 0, void 0, function* () {
-            let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+            let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
             if (filter != null) {
                 query += " WHERE " + filter;
             }
@@ -538,7 +551,7 @@ class CassandraPersistence {
     getListByFilter(correlationId, filter, sort, select) {
         return __awaiter(this, void 0, void 0, function* () {
             select = select != null ? select : "*";
-            let query = "SELECT " + select + " FROM " + this.quoteIdentifier(this._tableName);
+            let query = "SELECT " + select + " FROM " + this.quotedTableName();
             if (filter != null) {
                 query += " WHERE " + filter;
             }
@@ -564,13 +577,13 @@ class CassandraPersistence {
      */
     getOneRandom(correlationId, filter) {
         return __awaiter(this, void 0, void 0, function* () {
-            let query = 'SELECT COUNT(*) FROM ' + this.quoteIdentifier(this._tableName);
+            let query = 'SELECT COUNT(*) FROM ' + this.quotedTableName();
             if (filter != null) {
                 query += " WHERE " + filter;
             }
             let result = yield this._client.execute(query);
             let count = result.rows && result.rows.length == 1 ? result.rows[0].count : 0;
-            query = "SELECT * FROM " + this.quoteIdentifier(this._tableName);
+            query = "SELECT * FROM " + this.quotedTableName();
             if (filter != null) {
                 query += " WHERE " + filter;
             }
@@ -615,7 +628,7 @@ class CassandraPersistence {
             let columns = this.generateColumns(row);
             let params = this.generateParameters(row);
             let values = this.generateValues(row);
-            let query = "INSERT INTO " + this.quoteIdentifier(this._tableName)
+            let query = "INSERT INTO " + this.quotedTableName()
                 + " (" + columns + ") VALUES (" + params + ")";
             yield this._client.execute(query, values);
             this._logger.trace(correlationId, "Created in %s with id = %s", this._tableName, row.id);
@@ -633,7 +646,7 @@ class CassandraPersistence {
      */
     deleteByFilter(correlationId, filter) {
         return __awaiter(this, void 0, void 0, function* () {
-            let query = "DELETE FROM " + this.quoteIdentifier(this._tableName);
+            let query = "DELETE FROM " + this.quotedTableName();
             if (filter != null) {
                 query += " WHERE " + filter;
             }

@@ -19,7 +19,8 @@ import { CassandraPersistence } from './CassandraPersistence';
 
  * ### Configuration parameters ###
  *
- * - collection:                  (optional) Cassandra collection name
+ * - table:                       (optional) Cassandra table name
+ * - keyspace:                    (optional) Cassandra keyspace name
  * - connection(s):
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-nodex.github.io/pip-services3-components-nodex/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -86,9 +87,10 @@ export declare class IdentifiableCassandraPersistence<T extends IIdentifiable<K>
     /**
      * Creates a new instance of the persistence component.
      *
-     * @param collection    (optional) a collection name.
+     * @param tableName    (optional) a table name.
+     * @param keyspaceName    (optional) a keyspace name.
      */
-    constructor(tableName: string);
+    constructor(tableName: string, keyspaceName?: string);
     /**
      * Converts the given object from the public partial format.
      *

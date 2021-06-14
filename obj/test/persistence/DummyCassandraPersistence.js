@@ -5,11 +5,11 @@ const pip_services3_commons_nodex_1 = require("pip-services3-commons-nodex");
 const IdentifiableCassandraPersistence_1 = require("../../src/persistence/IdentifiableCassandraPersistence");
 class DummyCassandraPersistence extends IdentifiableCassandraPersistence_1.IdentifiableCassandraPersistence {
     constructor() {
-        super('test.dummies');
+        super('dummies', 'test');
     }
     defineSchema() {
         this.clearSchema();
-        this.ensureSchema('CREATE TABLE ' + this._tableName + ' (id TEXT PRIMARY KEY, key TEXT, content TEXT)');
+        this.ensureSchema('CREATE TABLE ' + this.quotedTableName() + ' (id TEXT PRIMARY KEY, key TEXT, content TEXT)');
         this.ensureIndex('key', { key: 1 }, { unique: true });
     }
     getPageByFilter(correlationId, filter, paging) {

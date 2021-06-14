@@ -26,7 +26,8 @@ const CassandraPersistence_1 = require("./CassandraPersistence");
 
  * ### Configuration parameters ###
  *
- * - collection:                  (optional) Cassandra collection name
+ * - table:                       (optional) Cassandra table name
+ * - keyspace:                    (optional) Cassandra keyspace name
  * - connection(s):
  *   - discovery_key:             (optional) a key to retrieve the connection from [[https://pip-services3-nodex.github.io/pip-services3-components-nodex/interfaces/connect.idiscovery.html IDiscovery]]
  *   - host:                      host name or IP address
@@ -93,13 +94,11 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
     /**
      * Creates a new instance of the persistence component.
      *
-     * @param collection    (optional) a collection name.
+     * @param tableName    (optional) a table name.
+     * @param keyspaceName    (optional) a keyspace name.
      */
-    constructor(tableName) {
-        super(tableName);
-        if (tableName == null) {
-            throw new Error("Table name could not be null");
-        }
+    constructor(tableName, keyspaceName) {
+        super(tableName, keyspaceName);
     }
     /**
      * Converts the given object from the public partial format.
@@ -120,7 +119,7 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
     getListByIds(correlationId, ids) {
         return __awaiter(this, void 0, void 0, function* () {
             let params = this.generateParameters(ids);
-            let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName)
+            let query = "SELECT * FROM " + this.quotedTableName()
                 + " WHERE \"id\" IN(" + params + ")";
             let result = yield this._client.execute(query, ids);
             let items = result.rows;
@@ -138,7 +137,7 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
      */
     getOneById(correlationId, id) {
         return __awaiter(this, void 0, void 0, function* () {
-            let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+            let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
             let params = [id];
             let result = yield this._client.execute(query, params);
             let item = result && result.rows ? result.rows[0] || null : null;
@@ -207,7 +206,7 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
             let params = this.generateSetParameters(row);
             let values = this.generateValues(row);
             values.push(item.id);
-            let query = "UPDATE " + this.quoteIdentifier(this._tableName)
+            let query = "UPDATE " + this.quotedTableName()
                 + " SET " + params + " WHERE \"id\"=?";
             yield this._client.execute(query, values);
             this._logger.trace(correlationId, "Updated in %s with id = %s", this._tableName, item.id);
@@ -234,10 +233,10 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
             let params = this.generateSetParameters(row);
             let values = this.generateValues(row);
             values.push(id);
-            let query = "UPDATE " + this.quoteIdentifier(this._tableName)
+            let query = "UPDATE " + this.quotedTableName()
                 + " SET " + params + " WHERE \"id\"=?";
             yield this._client.execute(query, values);
-            query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+            query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
             let result = yield this._client.execute(query, [id]);
             let newItem = result && result.rows && result.rows.length == 1
                 ? result.rows[0] : null;
@@ -256,12 +255,12 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
     deleteById(correlationId, id) {
         return __awaiter(this, void 0, void 0, function* () {
             let values = [id];
-            let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+            let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"id\"=?";
             let result = yield this._client.execute(query, values);
             let oldItem = result && result.rows && result.rows.length == 1
                 ? result.rows[0] : null;
             if (oldItem != null) {
-                query = "DELETE FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"id\"=?";
+                query = "DELETE FROM " + this.quotedTableName() + " WHERE \"id\"=?";
                 yield this._client.execute(query, values);
                 this._logger.trace(correlationId, "Deleted from %s with id = %s", this._tableName, id);
             }
@@ -278,7 +277,7 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
     deleteByIds(correlationId, ids) {
         return __awaiter(this, void 0, void 0, function* () {
             let params = this.generateParameters(ids);
-            let query = "DELETE FROM " + this.quoteIdentifier(this._tableName)
+            let query = "DELETE FROM " + this.quotedTableName()
                 + " WHERE \"id\" IN(" + params + ")";
             yield this._client.execute(query, ids);
             // We can't optimally determine how many records were deleted

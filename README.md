@@ -93,7 +93,7 @@ export class MyCassandraPersistence extends IdentifableCassandraPersistence {
   }  
   
   public getOneByKey(correlationId: string, key: string): Promise<MyObject> {
-    let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE \"key\"=$1";
+    let query = "SELECT * FROM " + this.quotedTableName() + " WHERE \"key\"=$1";
     let params = [ key ];
 
     return new Promise((resolve, reject) => {
@@ -160,7 +160,7 @@ export class MyCassandraPersistence extends IdentifableJsonCassandraPersistence 
   }  
   
   public getOneByKey(correlationId: string, key: string): Promise<MyObject> { 
-    let query = "SELECT * FROM " + this.quoteIdentifier(this._tableName) + " WHERE data->>'key'=$1";
+    let query = "SELECT * FROM " + this.quotedTableName() + " WHERE data->>'key'=$1";
     let params = [ key ];
 
     return new Promise((resolve, reject) => {
