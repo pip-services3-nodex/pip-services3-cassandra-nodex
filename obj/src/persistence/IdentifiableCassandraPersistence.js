@@ -99,6 +99,10 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
      */
     constructor(tableName, keyspaceName) {
         super(tableName, keyspaceName);
+        /**
+         * Flag to turn on automated string ID generation
+         */
+        this._autoGenerateId = true;
     }
     /**
      * Converts the given object from the public partial format.
@@ -168,7 +172,7 @@ class IdentifiableCassandraPersistence extends CassandraPersistence_1.CassandraP
             }
             // Assign unique id
             let newItem = item;
-            if (newItem.id == null) {
+            if (newItem.id == null && this._autoGenerateId) {
                 newItem = Object.assign({}, newItem);
                 newItem.id = item.id || pip_services3_commons_nodex_1.IdGenerator.nextLong();
             }

@@ -89,6 +89,10 @@ import { CassandraPersistence } from './CassandraPersistence';
  */
 export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> extends CassandraPersistence<T>
     implements IWriter<T, K>, IGetter<T, K>, ISetter<T> {
+    /**
+     * Flag to turn on automated string ID generation
+     */
+    protected _autoGenerateId: boolean = true;
 
     /**
      * Creates a new instance of the persistence component.
@@ -169,7 +173,7 @@ export class IdentifiableCassandraPersistence<T extends IIdentifiable<K>, K> ext
 
         // Assign unique id
         let newItem: any = item;
-        if (newItem.id == null) {
+        if (newItem.id == null && this._autoGenerateId) {
             newItem = Object.assign({}, newItem);
             newItem.id = item.id || IdGenerator.nextLong();
         }

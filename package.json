@@ -1,6 +1,6 @@
 {
     "name": "pip-services3-cassandra-nodex",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "author": "Conceptual Vision Consulting LLC",
     "description": "Cassandra components for Pip.Services in Node.js / ES2017",
     "contributors": [
