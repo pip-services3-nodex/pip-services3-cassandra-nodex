@@ -192,7 +192,7 @@ class CassandraPersistence {
         // }
         let indexName = this.quoteIdentifier(name);
         if (indexName != null) {
-            indexName += this.quoteIdentifier(this._keyspaceName) + "." + indexName;
+            indexName = this.quoteIdentifier(this._keyspaceName + '_' + indexName.slice(1, -1));
         }
         builder += " INDEX IF NOT EXISTS " + indexName + " ON " + this.quotedTableName();
         if (options.type) {
@@ -361,16 +361,19 @@ class CassandraPersistence {
                 return;
             }
             catch (ex) {
-                if (ex.message && ex.message.indexOf("Keyspace") >= 0 && ex.message.indexOf("does not exist") > 0) {
+                let originalMsg = ex.message;
+                ex.message = ex.message.toLowerCase();
+                if (ex.message && ex.message.indexOf("keyspace") >= 0 && ex.message.indexOf("does not exist") > 0) {
                     keyspaceExist = false;
                 }
-                if (ex.message && ex.message.indexOf("Table") >= 0 && ex.message.indexOf("does not exist") > 0) {
+                if (ex.message && ex.message.indexOf("table") >= 0 && ex.message.indexOf("does not exist") > 0) {
                     tableExist = false;
                 }
                 if (ex.message && ex.message.indexOf("unconfigured table") >= 0) {
                     tableExist = false;
                 }
                 if (keyspaceExist && tableExist) {
+                    ex.message = originalMsg;
                     throw ex;
                 }
             }

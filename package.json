@@ -1,6 +1,6 @@
 {
     "name": "pip-services3-cassandra-nodex",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "Conceptual Vision Consulting LLC",
     "description": "Cassandra components for Pip.Services in Node.js / ES2017",
     "contributors": [
@@ -30,7 +30,7 @@
     "scripts": {
         "build": "tsc",
         "watch": "tsc --watch",
-        "delay_test": "sleep 30 && echo Continue... && mocha -t 30000 -R spec -u tdd --recursive ./obj/test",
+        "delay_test": "sleep 75 && echo Continue... && mocha -t 30000 -R spec -u tdd --recursive ./obj/test",
         "test": "mocha -t 10000 -R spec -u tdd --recursive ./obj/test",
         "retest": "tsc && mocha -t 10000 -R spec -u tdd --recursive ./obj/test"
     },

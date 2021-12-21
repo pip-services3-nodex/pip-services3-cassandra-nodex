@@ -133,7 +133,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      * The logger.
      */
     protected _logger: CompositeLogger = new CompositeLogger();
-    
+
     /**
      * The Cassandra connection component.
      */
@@ -190,9 +190,9 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     }
 
     /**
-	 * Sets references to dependent components.
-	 * 
-	 * @param references 	references to locate the component dependencies. 
+     * Sets references to dependent components.
+     * 
+     * @param references 	references to locate the component dependencies. 
      */
     public setReferences(references: IReferences): void {
         this._references = references;
@@ -211,7 +211,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     }
 
     /**
-	 * Unsets (clears) previously set references to dependent components. 
+     * Unsets (clears) previously set references to dependent components. 
      */
     public unsetReferences(): void {
         this._connection = null;
@@ -219,15 +219,15 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
     private createConnection(): CassandraConnection {
         let connection = new CassandraConnection();
-        
+
         if (this._config) {
             connection.configure(this._config);
         }
-        
+
         if (this._references) {
             connection.setReferences(this._references);
         }
-            
+
         return connection;
     }
 
@@ -244,12 +244,12 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         // if (options.unique) {
         //     builder += " UNIQUE";
         // }
-        
+
         let indexName = this.quoteIdentifier(name);
         if (indexName != null) {
-            indexName += this.quoteIdentifier(this._keyspaceName) + "." + indexName;
+            indexName = this.quoteIdentifier(this._keyspaceName + '_' + indexName.slice(1, -1));
         }
-        
+
         builder += " INDEX IF NOT EXISTS " + indexName + " ON " + this.quotedTableName();
 
         if (options.type) {
@@ -267,7 +267,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         builder += " (" + fields + ")";
 
-        this.ensureSchema(builder);       
+        this.ensureSchema(builder);
     }
 
     /**
@@ -304,7 +304,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         // Convert to plain object and remove special fields
         value = Object.assign({}, value);
         return value;
-    }    
+    }
 
     /** 
      * Convert object value from public to internal format.
@@ -314,7 +314,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      */
     protected convertFromPublic(value: any): any {
         return value;
-    }    
+    }
 
     protected quoteIdentifier(value: string): string {
         if (value == null || value == "") return value;
@@ -337,24 +337,24 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     }
 
     /**
-	 * Checks if the component is opened.
-	 * 
-	 * @returns true if the component has been opened and false otherwise.
+     * Checks if the component is opened.
+     * 
+     * @returns true if the component has been opened and false otherwise.
      */
     public isOpen(): boolean {
         return this._opened;
     }
 
     /**
-	 * Opens the component.
-	 * 
-	 * @param correlationId 	(optional) transaction id to trace execution through call chain.
+     * Opens the component.
+     * 
+     * @param correlationId 	(optional) transaction id to trace execution through call chain.
      */
     public async open(correlationId: string): Promise<void> {
-    	if (this._opened) {
+        if (this._opened) {
             return;
         }
-        
+
         if (this._connection == null) {
             this._connection = this.createConnection();
             this._localConnection = true;
@@ -384,7 +384,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         this._client = this._connection.getConnection();
         this._datacenter = this._connection.getDatacenter();
-        
+
         // Define database schema
         this.defineSchema();
 
@@ -392,23 +392,23 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         await this.createSchema(correlationId);
 
         this._opened = true;
-        this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quotedTableName());                        
+        this._logger.debug(correlationId, "Connected to Cassandra cluster %s, table %s", this._datacenter, this.quotedTableName());
     }
 
     /**
-	 * Closes component and frees used resources.
-	 * 
-	 * @param correlationId 	(optional) transaction id to trace execution through call chain.
+     * Closes component and frees used resources.
+     * 
+     * @param correlationId 	(optional) transaction id to trace execution through call chain.
      */
     public async close(correlationId: string): Promise<void> {
-    	if (!this._opened) {
+        if (!this._opened) {
             return;
         }
 
         if (this._connection == null) {
             throw new InvalidStateException(
-                correlationId, 
-                'NO_CONNECTION', 
+                correlationId,
+                'NO_CONNECTION',
                 'Cassandra connection is missing'
             );
         }
@@ -422,9 +422,9 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
     }
 
     /**
-	 * Clears component state.
-	 * 
-	 * @param correlationId 	(optional) transaction id to trace execution through call chain.
+     * Clears component state.
+     * 
+     * @param correlationId 	(optional) transaction id to trace execution through call chain.
      */
     public async clear(correlationId: string): Promise<void> {
         // Return error if collection is not set
@@ -440,7 +440,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         if (this._schemaStatements == null || this._schemaStatements.length == 0) {
             return null;
         }
-    
+
         // Check if table exist to determine weither to auto create objects
         let query = "SELECT * FROM " + this.quotedTableName() + " LIMIT 1";
         let keyspaceExist = true;
@@ -450,10 +450,13 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
             // If there are no exception, then table already exist and we shall skill the schema creation
             return;
         } catch (ex) {
-            if (ex.message && ex.message.indexOf("Keyspace") >= 0 && ex.message.indexOf("does not exist") > 0) {
+            let originalMsg: string = ex.message;
+            ex.message = ex.message.toLowerCase();
+
+            if (ex.message && ex.message.indexOf("keyspace") >= 0 && ex.message.indexOf("does not exist") > 0) {
                 keyspaceExist = false;
             }
-            if (ex.message && ex.message.indexOf("Table") >= 0 && ex.message.indexOf("does not exist") > 0) {
+            if (ex.message && ex.message.indexOf("table") >= 0 && ex.message.indexOf("does not exist") > 0) {
                 tableExist = false;
             }
             if (ex.message && ex.message.indexOf("unconfigured table") >= 0) {
@@ -461,6 +464,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
             }
 
             if (keyspaceExist && tableExist) {
+                ex.message = originalMsg;
                 throw ex;
             }
         }
@@ -557,9 +561,9 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
      * @param select            (optional) projection JSON object
      * @returns                 the requested data page
      */
-    protected async getPageByFilter(correlationId: string, filter: any, paging: PagingParams, 
+    protected async getPageByFilter(correlationId: string, filter: any, paging: PagingParams,
         sort: any, select: any): Promise<DataPage<T>> {
-        
+
         select = select != null ? select : "*"
         let query = "SELECT " + select + " FROM " + this.quotedTableName();
 
@@ -573,7 +577,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
             query += " WHERE " + filter;
         }
 
-        if (sort!= null) {
+        if (sort != null) {
             query += " ORDER BY " + sort;
         }
 
@@ -614,7 +618,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
             }
 
             let result = await this._client.execute(query);
-            let count = result.rows && result.rows.length == 1 
+            let count = result.rows && result.rows.length == 1
                 ? LongConverter.toLong(result.rows[0].count) : 0;
 
             return new DataPage<T>(items, count);
@@ -641,11 +645,11 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         }
 
         let result = await this._client.execute(query);
-        let count = result.rows && result.rows.length == 1 
+        let count = result.rows && result.rows.length == 1
             ? LongConverter.toLong(result.rows[0].count) : 0;
 
         this._logger.trace(correlationId, "Counted %d items in %s", count, this._tableName);
-            
+
         return count;
     }
 
@@ -679,8 +683,8 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         let result = await this._client.execute(query);
         let items = result.rows;
 
-        this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._tableName); 
-                
+        this._logger.trace(correlationId, "Retrieved %d from %s", items.length, this._tableName);
+
         items = items.map(this.convertToPublic);
         return items;
     }
@@ -703,17 +707,17 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         let result = await this._client.execute(query);
         let count = result.rows && result.rows.length == 1 ? result.rows[0].count : 0;
-           
-        query = "SELECT * FROM " + this.quotedTableName();    
+
+        query = "SELECT * FROM " + this.quotedTableName();
         if (filter != null) {
             query += " WHERE " + filter;
         }
-    
+
         let pos = Math.trunc(Math.random() * count);
         // Limit search a reasonable number
         pos = Math.min(pos, this._maxPageSize);
         query += " LIMIT " + (pos + 1);
-    
+
         let item = await new Promise<any>((resolve, reject) => {
             let item: any = null;
             this._client.eachRow(
@@ -733,7 +737,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         } else {
             this._logger.trace(correlationId, "Retrieved random item from %s", this._tableName);
         }
-                
+
         item = this.convertToPublic(item);
         return item;
     }
