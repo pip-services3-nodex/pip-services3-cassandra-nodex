@@ -25,7 +25,7 @@ export class DummyCassandraPersistence
         filter = filter || new FilterParams();
         let key = filter.getAsNullableString('key');
 
-        let filterCondition: string = null;
+        let filterCondition: string = '';
         if (key != null)
             filterCondition += "key='" + key + "'";
 
@@ -36,7 +36,7 @@ export class DummyCassandraPersistence
         filter = filter || new FilterParams();
         let key = filter.getAsNullableString('key');
 
-        let filterCondition: string = null;
+        let filterCondition: string = '';
         if (key != null)
             filterCondition += "key='" + key + "'";
 

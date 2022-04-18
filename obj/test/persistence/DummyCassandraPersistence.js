@@ -15,7 +15,7 @@ class DummyCassandraPersistence extends IdentifiableCassandraPersistence_1.Ident
     getPageByFilter(correlationId, filter, paging) {
         filter = filter || new pip_services3_commons_nodex_1.FilterParams();
         let key = filter.getAsNullableString('key');
-        let filterCondition = null;
+        let filterCondition = '';
         if (key != null)
             filterCondition += "key='" + key + "'";
         return super.getPageByFilter(correlationId, filterCondition, paging, null, null);
@@ -23,7 +23,7 @@ class DummyCassandraPersistence extends IdentifiableCassandraPersistence_1.Ident
     getCountByFilter(correlationId, filter) {
         filter = filter || new pip_services3_commons_nodex_1.FilterParams();
         let key = filter.getAsNullableString('key');
-        let filterCondition = null;
+        let filterCondition = '';
         if (key != null)
             filterCondition += "key='" + key + "'";
         return super.getCountByFilter(correlationId, filterCondition);
