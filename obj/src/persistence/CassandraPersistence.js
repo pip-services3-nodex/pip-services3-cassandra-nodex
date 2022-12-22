@@ -265,7 +265,7 @@ class CassandraPersistence {
         }
         let builder = this.quoteIdentifier(this._tableName);
         if (this._keyspaceName != null) {
-            builder = this.quoteIdentifier(this._keyspaceName) + "." + this._tableName;
+            builder = this.quoteIdentifier(this._keyspaceName) + "." + builder;
         }
         return builder;
     }

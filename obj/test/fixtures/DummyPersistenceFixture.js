@@ -72,7 +72,7 @@ class DummyPersistenceFixture {
             result = yield this._persistence.getOneById(null, dummy1.id);
             // Try to get item
             assert.isNull(result);
-            let count = yield this._persistence.getCountByFilter(null, null);
+            let count = yield this._persistence.getCountByFilter(null, pip_services3_commons_nodex_1.FilterParams.fromTuples("key", "Key 2"));
             assert.equal(count, 1);
         });
     }

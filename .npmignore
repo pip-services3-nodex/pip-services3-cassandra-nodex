@@ -9,3 +9,4 @@
 /*.sh
 /*.ps1
 /.github
+/docker/id_rsa*

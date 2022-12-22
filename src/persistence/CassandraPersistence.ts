@@ -331,7 +331,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
 
         let builder = this.quoteIdentifier(this._tableName);
         if (this._keyspaceName != null) {
-            builder = this.quoteIdentifier(this._keyspaceName) + "." + this._tableName;
+            builder = this.quoteIdentifier(this._keyspaceName) + "." + builder;
         }
         return builder;
     }
@@ -643,7 +643,7 @@ export class CassandraPersistence<T> implements IReferenceable, IUnreferenceable
         if (filter != null) {
             query += " WHERE " + filter;
         }
-
+        
         let result = await this._client.execute(query);
         let count = result.rows && result.rows.length == 1
             ? LongConverter.toLong(result.rows[0].count) : 0;

@@ -1,6 +1,6 @@
 const assert = require('chai').assert;
 
-import { AnyValueMap } from 'pip-services3-commons-nodex';
+import { AnyValueMap, FilterParams } from 'pip-services3-commons-nodex';
 import { Dummy } from './Dummy';
 import { IDummyPersistence } from './IDummyPersistence';
 
@@ -81,7 +81,7 @@ export class DummyPersistenceFixture {
         // Try to get item
         assert.isNull(result);
 
-        let count = await this._persistence.getCountByFilter(null, null);
+        let count = await this._persistence.getCountByFilter(null, FilterParams.fromTuples("key", "Key 2"));
         assert.equal(count, 1);
     }
 
